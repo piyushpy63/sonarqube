@@ -1,0 +1,10 @@
+# Ignore compiled Java classes
+*.class
+
+# Ignore SonarQube temporary files
+.sonar/
+.scannerwork/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
