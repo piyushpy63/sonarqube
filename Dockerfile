@@ -1,8 +1,12 @@
-FROM openjdk:17-jdk-alpine
+# Use Eclipse Temurin (Standard OpenJDK build)
+FROM eclipse-temurin:17-jdk-alpine
 
+# Set working directory
 WORKDIR /app
 
-COPY notes_app.class .
+# Copy the compiled class file
+# (Ensure your CI pipeline names the file SecureNotesApp.class correctly!)
+COPY SecureNotesApp.class .
 
-CMD [ "java", "notes_app" ]
-
+# Run the application
+CMD ["java", "SecureNotesApp"]
