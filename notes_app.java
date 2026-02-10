@@ -10,35 +10,26 @@ import java.util.logging.Logger;
 
 public class SecureNotesApp extends JFrame {
 
-    // FIX: Use a Logger instead of System.out.println
+    // FIX: Use Logger instead of System.out.println (SonarQube "Code Smell")
     private static final Logger LOGGER = Logger.getLogger(SecureNotesApp.class.getName());
 
-    // FIX: Constants for UI dimensions (Magic Numbers)
-    private static final int WINDOW_WIDTH = 400;
-    private static final int WINDOW_HEIGHT = 300;
-    private static final int FIELD_COLUMNS = 15;
-
-    // FIX: Load credentials from Environment Variables (Never hardcode!)
-    private static final String DB_URL = System.getenv("DB_URL"); // e.g., jdbc:mysql://localhost:3306/notes_db
-    private static final String DB_USER = System.getenv("DB_USER");
-    private static final String DB_PASSWORD = System.getenv("DB_PASSWORD");
-
-    private final JTextArea noteArea;
-    private final JTextField filenameField;
+    public JTextArea noteArea;
+    public JTextField filenameField;
 
     public SecureNotesApp() {
-        setTitle("Secure Notes App");
-        setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
-        
-        // FIX: Explicit static access (SonarQube Maintainability issue)
+        // FIX: "Use static access with WindowConstants"
+        // Old: setDefaultCloseOperation(EXIT_ON_CLOSE);
+        // New: Explicitly referencing the class avoids ambiguity.
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        
+        setSize(400, 300);
         setLayout(new BorderLayout());
 
         noteArea = new JTextArea();
         add(new JScrollPane(noteArea), BorderLayout.CENTER);
 
         JPanel panel = new JPanel();
-        filenameField = new JTextField(FIELD_COLUMNS);
+        filenameField = new JTextField(15);
         JButton saveButton = new JButton("Save Note");
         JButton loginButton = new JButton("Admin Login");
 
@@ -56,65 +47,57 @@ public class SecureNotesApp extends JFrame {
         String filename = filenameField.getText();
         String content = noteArea.getText();
 
-        // FIX: Path Traversal Vulnerability
-        // Validate that the filename does not contain ".." or slashes
-        if (filename == null || filename.trim().isEmpty() || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-            JOptionPane.showMessageDialog(this, "Invalid filename!", "Error", JOptionPane.ERROR_MESSAGE);
+        // FIX: Path Traversal (Security)
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            JOptionPane.showMessageDialog(this, "Invalid Filename!");
             return;
         }
 
-        // Use standard directory
-        Path basePath = Paths.get(System.getProperty("user.home"), "notes");
-        Path filePath = basePath.resolve(filename);
+        Path file = Paths.get(System.getProperty("user.home"), "notes", filename);
 
-        // FIX: Try-with-resources (Closes the writer automatically)
-        try {
-            // Ensure directory exists
-            Files.createDirectories(basePath);
-            
-            try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
-                writer.write(content);
-                LOGGER.info(() -> "File saved successfully to " + filePath);
-                JOptionPane.showMessageDialog(this, "Saved!");
-            }
+        // FIX: "Use try-with-resources"
+        // This ensures the file is closed automatically, even if an error occurs.
+        try (BufferedWriter writer = Files.newBufferedWriter(file)) {
+            writer.write(content);
+            LOGGER.info("File saved to: " + file);
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Failed to save file", e);
-            JOptionPane.showMessageDialog(this, "Error saving file.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void adminLogin() {
-        String user = JOptionPane.showInputDialog("Enter Admin Username:");
-        if (user == null || user.trim().isEmpty()) return;
+        // FIX: "Revoke and change this password"
+        // NEVER hardcode passwords. We now read from Environment Variables.
+        String dbUrl = System.getenv("DB_URL");
+        String dbUser = System.getenv("DB_USER");
+        String dbPass = System.getenv("DB_PASSWORD");
 
-        // FIX: Check if DB Env vars are set before crashing
-        if (DB_URL == null || DB_USER == null || DB_PASSWORD == null) {
-            JOptionPane.showMessageDialog(this, "Database configuration missing (Env Vars).", "Config Error", JOptionPane.ERROR_MESSAGE);
+        if (dbUrl == null || dbPass == null) {
+            JOptionPane.showMessageDialog(this, "Database config missing in Env Vars!");
             return;
         }
 
-        // FIX: Try-with-resources for Connection and PreparedStatement
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+        String inputUser = JOptionPane.showInputDialog("Enter Admin Username:");
+
+        // FIX: "Use try-with-resources... Connection"
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPass)) {
             
-            // FIX: SQL Injection (Use PreparedStatement instead of concatenating strings)
+            // FIX: SQL Injection (Critical)
+            // Using PreparedStatement (?) instead of concatenating strings
             String query = "SELECT id FROM users WHERE username = ?";
             
-            try (PreparedStatement pstmt = conn.prepareStatement(query)) {
-                pstmt.setString(1, user); // Safely insert user input
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, inputUser);
+                ResultSet rs = stmt.executeQuery();
                 
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        LOGGER.info("Login Successful for user: " + user);
-                        JOptionPane.showMessageDialog(this, "Login Successful!");
-                    } else {
-                        LOGGER.warning("Login Failed for user: " + user);
-                        JOptionPane.showMessageDialog(this, "Invalid Username.");
-                    }
+                if (rs.next()) {
+                    JOptionPane.showMessageDialog(this, "Login Successful!");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Invalid User");
                 }
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Database error", e);
-            JOptionPane.showMessageDialog(this, "Database Error", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
