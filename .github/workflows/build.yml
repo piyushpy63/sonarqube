@@ -36,12 +36,30 @@ jobs:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
 
-        # 7. Build and Push Docker Image
-        - name: Build and Push
-          if: success()
+        # 7. Build  Image
+        - name: Build and Load Docker Image
           uses: docker/build-push-action@v4
           with:
             context: .
             push: true
             tags: ${{ secrets.DOCKER_USERNAME }}/bad-notes-app:latest
 
+        # 8. Scan Image with Trivy
+        - name: Scan Docker Image with Trivy
+          uses: aquasecurity/trivy-action@master
+          with:
+            image-ref: ${{ secrets.DOCKER_USERNAME }}/bad-notes-app:latest
+            format: 'table'
+            exit-code: '1'
+            ignore-unfixed: true
+            vulnerability-type: 'os,library'
+            severity: 'CRITICAL,HIGH'
+
+       # 9. Push Docker Image
+        - name: Push Docker Image
+          if: success()
+          uses: docker/build-push-action@v4
+          with:
+            context: .
+            push: true
+            tags: ${{ secrets.DOCKER_USERNAME }}/bad-notes-app:latest
