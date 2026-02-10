@@ -6,7 +6,7 @@ on:
         branches: [ main ]
 
 jobs:
-    buildscanpush:
+    buildscan:
         runs-on: ubuntu-latest
 
         steps:
@@ -28,7 +28,12 @@ jobs:
           env:
             SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
             SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-            
+
+    dockerscanpush:
+        runs-on: ubuntu-latest
+        needs: buildscan
+
+        steps:
         - name: Log in to Docker Hub
           if: success()
           uses: docker/login-action@v1
